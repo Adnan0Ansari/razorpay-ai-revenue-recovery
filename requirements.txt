@@ -3,3 +3,4 @@ numpy
 scikit-learn
 anthropic
 streamlit
+python-dotenv
