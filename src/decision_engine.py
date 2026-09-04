@@ -7,6 +7,9 @@ low-confidence or risky cases.
 
 import pandas as pd
 import joblib
+import os
+import csv
+from datetime import datetime
 
 # --- Load the trained model + encoders from Step 4 ---
 model = joblib.load("src/retry_model.pkl")
@@ -73,9 +76,20 @@ def decide_action(transaction: dict) -> dict:
                   f"Flagging for human review rather than guessing."
     }
 
+TIMING_RELEVANT_REASONS = {"otp_timeout", "network_error", "session_timeout", "bank_server_down"}
+
 def find_optimal_retry_hour(transaction: dict) -> dict:
     """Tests this transaction's success probability across all 24 hours
-    and returns the hour with the highest predicted success rate."""
+    and returns the hour with the highest predicted success rate.
+    Only meaningful for failure reasons where timing genuinely matters."""
+
+    if transaction["failure_reason"] not in TIMING_RELEVANT_REASONS:
+        return {
+            "applicable": False,
+            "reason_skipped": f"Timing doesn't meaningfully affect '{transaction['failure_reason']}' — "
+                               f"this failure isn't related to server/network conditions."
+        }
+
     best_hour = None
     best_proba = -1
     hourly_results = {}
@@ -93,6 +107,7 @@ def find_optimal_retry_hour(transaction: dict) -> dict:
     current_proba = hourly_results[current_hour]
 
     return {
+        "applicable": True,
         "current_hour": current_hour,
         "current_hour_confidence": current_proba,
         "recommended_hour": best_hour,
@@ -100,7 +115,36 @@ def find_optimal_retry_hour(transaction: dict) -> dict:
         "improvement": round(best_proba - current_proba, 3),
         "hourly_breakdown": hourly_results,
     }
+import csv
+from datetime import datetime
 
+AUDIT_LOG_PATH = "data/audit_log.csv"
+
+def log_decision(transaction: dict, decision: dict, explanation: dict = None):
+    """Appends a record of this decision to a CSV audit trail."""
+    file_exists = os.path.exists(AUDIT_LOG_PATH)
+
+    with open(AUDIT_LOG_PATH, mode="a", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow([
+                "timestamp", "amount", "payment_method", "bank", "failure_reason",
+                "hour_of_day", "previous_failed_attempts", "confidence",
+                "action", "reason", "internal_explanation"
+            ])
+        writer.writerow([
+            datetime.now().isoformat(),
+            transaction.get("amount"),
+            transaction.get("payment_method"),
+            transaction.get("bank"),
+            transaction.get("failure_reason"),
+            transaction.get("hour_of_day"),
+            transaction.get("previous_failed_attempts"),
+            decision.get("confidence"),
+            decision.get("action"),
+            decision.get("reason"),
+            explanation.get("internal_explanation") if explanation else "",
+        ])
 if __name__ == "__main__":
     # --- Quick manual test with a few example transactions ---
     test_transactions = [

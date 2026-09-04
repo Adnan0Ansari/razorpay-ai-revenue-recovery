@@ -9,10 +9,9 @@ import pandas as pd
 import sys
 import os
 
-# --- Let this file import from src/, since app.py lives outside src/ ---
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))   # MUST come first
 
-from decision_engine import decide_action
+from decision_engine import decide_action, find_optimal_retry_hour, log_decision   # THEN this
 from explainer import explain_decision
 
 st.set_page_config(page_title="AI Revenue Recovery", layout="centered")
@@ -53,7 +52,7 @@ if st.button("Run Analysis"):
     with st.spinner("Running model, decision engine, and explainer..."):
         decision = decide_action(txn)
         explanation = explain_decision(txn, decision)
-
+        log_decision(txn, decision, explanation)
     st.subheader("2. Result")
 
     # --- Color-coded action badge ---
@@ -77,12 +76,15 @@ if st.button("Run Analysis"):
     from decision_engine import find_optimal_retry_hour
     timing = find_optimal_retry_hour(txn)
 
-    st.subheader("Optimal Retry Timing")
-    if timing["improvement"] > 0.02:
+    st.subheader("4. Optimal Retry Timing")
+    if not timing["applicable"]:
+        st.write(f"⏸️ {timing['reason_skipped']}")
+    elif timing["improvement"] > 0.02:
         st.write(f"⏰ Retrying at **{timing['recommended_hour']}:00** instead of "
                  f"**{timing['current_hour']}:00** could improve success chances from "
                  f"**{timing['current_hour_confidence']:.0%}** to **{timing['recommended_hour_confidence']:.0%}**.")
+        st.line_chart(pd.Series(timing["hourly_breakdown"]))
     else:
         st.write(f"Current time ({timing['current_hour']}:00) is already close to optimal.")
-
-    st.line_chart(pd.Series(timing["hourly_breakdown"]))
+        st.line_chart(pd.Series(timing["hourly_breakdown"]))
+    

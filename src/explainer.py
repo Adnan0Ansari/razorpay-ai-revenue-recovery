@@ -71,12 +71,21 @@ INTERNAL_EXPLANATION: <text>
 CUSTOMER_MESSAGE: <text>
 """
 
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=prompt
-    )
-
-    text = response.text
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt
+        )
+        text = response.text
+    except Exception as e:
+        # --- Graceful fallback: don't crash the app if the LLM API fails ---
+        return {
+            "internal_explanation": f"[AI explanation temporarily unavailable — API error: {type(e).__name__}. "
+                                     f"Rule-based reason: {decision['reason']}]",
+            "customer_message": "We're reviewing your payment and will follow up shortly."
+                                 if decision["action"] != "HOLD_FOR_HUMAN_REVIEW"
+                                 else "No customer message needed yet — pending review.",
+        }
 
     # --- Parse the two labeled sections out of the response ---
     internal = ""
