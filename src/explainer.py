@@ -21,7 +21,14 @@ FEATURE_IMPORTANCE_SUMMARY = (
     "failure_reason (40%), amount (19%), previous_failed_attempts (14%), "
     "hour_of_day (12%), bank (8%), payment_method (4%), is_repeat_customer (3%)"
 )
-
+FAILURE_REASON_GUIDANCE = {
+    "insufficient_funds": "Customer should add funds to their account before retrying — this is the direct fix.",
+    "otp_timeout": "Likely a simple user delay entering the OTP — retrying immediately usually works.",
+    "bank_server_down": "A temporary bank-side issue — suggest retrying after a short wait, or a different bank/method.",
+    "network_error": "Likely a connectivity glitch — retrying on a stable connection usually works.",
+    "card_declined": "Could be bank-side restrictions — suggest checking with their bank or trying another card/method.",
+    "session_timeout": "The session expired before completing — suggest retrying and completing the process more quickly.",
+}
 
 def explain_decision(transaction: dict, decision: dict) -> dict:
     """Sends the transaction + decision to Gemini, asks for grounded
@@ -43,6 +50,9 @@ MODEL DECISION:
 - Action: {decision['action']}
 - Confidence (probability of retry success): {decision['confidence']}
 - Rule-based reason: {decision['reason']}
+
+GUIDANCE FOR THIS SPECIFIC FAILURE REASON:
+{FAILURE_REASON_GUIDANCE.get(transaction['failure_reason'], "No specific guidance available.")}
 
 THE MODEL'S FEATURE IMPORTANCE (what it actually relies on most, ranked):
 {FEATURE_IMPORTANCE_SUMMARY}
