@@ -73,3 +73,16 @@ if st.button("Run Analysis"):
 
     st.write("**For the customer:**")
     st.success(explanation["customer_message"])
+
+    from decision_engine import find_optimal_retry_hour
+    timing = find_optimal_retry_hour(txn)
+
+    st.subheader("Optimal Retry Timing")
+    if timing["improvement"] > 0.02:
+        st.write(f"⏰ Retrying at **{timing['recommended_hour']}:00** instead of "
+                 f"**{timing['current_hour']}:00** could improve success chances from "
+                 f"**{timing['current_hour_confidence']:.0%}** to **{timing['recommended_hour_confidence']:.0%}**.")
+    else:
+        st.write(f"Current time ({timing['current_hour']}:00) is already close to optimal.")
+
+    st.line_chart(pd.Series(timing["hourly_breakdown"]))

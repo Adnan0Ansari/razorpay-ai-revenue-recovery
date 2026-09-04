@@ -73,6 +73,33 @@ def decide_action(transaction: dict) -> dict:
                   f"Flagging for human review rather than guessing."
     }
 
+def find_optimal_retry_hour(transaction: dict) -> dict:
+    """Tests this transaction's success probability across all 24 hours
+    and returns the hour with the highest predicted success rate."""
+    best_hour = None
+    best_proba = -1
+    hourly_results = {}
+
+    for hour in range(24):
+        test_txn = transaction.copy()
+        test_txn["hour_of_day"] = hour
+        proba = predict_probability(test_txn)
+        hourly_results[hour] = round(proba, 3)
+        if proba > best_proba:
+            best_proba = proba
+            best_hour = hour
+
+    current_hour = transaction["hour_of_day"]
+    current_proba = hourly_results[current_hour]
+
+    return {
+        "current_hour": current_hour,
+        "current_hour_confidence": current_proba,
+        "recommended_hour": best_hour,
+        "recommended_hour_confidence": round(best_proba, 3),
+        "improvement": round(best_proba - current_proba, 3),
+        "hourly_breakdown": hourly_results,
+    }
 
 if __name__ == "__main__":
     # --- Quick manual test with a few example transactions ---
